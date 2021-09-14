@@ -17,58 +17,39 @@
  optionally within square brackets <email>.
  * Gates Foundation
 
- - Rajiv Mothilal <rajiv.mothilal@modusbox.com>
+ * Crosslake
+ - Lewis Daly <lewisd@crosslaketech.com>
 
  --------------
  ******/
 'use strict'
 
-const Package = require('../package')
-const Inert = require('@hapi/inert')
-const Vision = require('@hapi/vision')
-const Blipp = require('blipp')
-const ErrorHandling = require('@mojaloop/central-services-error-handling')
-const EventPlugin = require('@mojaloop/central-services-shared').Util.Hapi.HapiEventPlugin
-const OpenapiBackendValidator = require('@mojaloop/central-services-shared').Util.Hapi.OpenapiBackendValidator
-const registerPlugins = async (server, openAPIBackend) => {
-  await server.register(OpenapiBackendValidator)
+const Sinon = require('sinon')
 
-  await server.register({
-    plugin: require('hapi-swagger'),
-    options: {
-      info: {
-        title: 'Event Sidecar Swagger Documentation',
-        version: Package.version
-      }
-    }
+const { registerPlugins } = require('../../src/plugins')
+
+let sandbox
+describe('plugins', () => {
+  beforeAll(() => {
+    sandbox = Sinon.createSandbox()
   })
 
-  await server.register({
-    plugin: require('@hapi/good'),
-    options: {
-      ops: {
-        interval: 10000
-      }
-    }
+  afterEach(() => {
+    sandbox.restore()
   })
 
-  await server.register({
-    plugin: {
-      name: 'openapi',
-      version: '1.0.0',
-      multiple: true,
-      register: function (server, options) {
-        server.expose('openapi', options.openapi)
+  describe('registerPlugins', () => {
+    it('registers the plugins', async () => {
+      // Arrange
+      const serverStub = {
+        register: sandbox.stub()
       }
-    },
-    options: {
-      openapi: openAPIBackend
-    }
+
+      // Act
+      await registerPlugins(serverStub)
+
+      // Assert
+      expect(serverStub.register.callCount).toBe(5)
+    })
   })
-
-  await server.register([Inert, Vision, Blipp, ErrorHandling, EventPlugin])
-}
-
-module.exports = {
-  registerPlugins
-}
+})

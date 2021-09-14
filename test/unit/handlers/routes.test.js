@@ -17,31 +17,35 @@
  optionally within square brackets <email>.
  * Gates Foundation
 
- * ModusBox
- - Rajiv Mothilal <rajiv.mothilal@modusbox.com>
- - Steven Oderayi <steven.oderayi@modusbox.com>
+ * Steven Oderayi <steven.oderayi@modusbox.com>
 
  --------------
  ******/
+
 'use strict'
 
-const HealthCheck = require('@mojaloop/central-services-shared').HealthCheck.HealthCheck
-const packageJson = require('../../package.json')
+const mockHandleRequest = jest.fn()
+const mockApi = { handleRequest: mockHandleRequest }
 
-const healthCheck = new HealthCheck(packageJson, [])
+const { APIRoutes } = require('../../../src/handlers/routes')
 
-/**
- * Operations on /health
- */
-module.exports = {
-  /**
-   * summary: Get Server
-   * description: The HTTP request GET /health is used to return the current status of the API.
-   * parameters:
-   * produces: application/json
-   * responses: 200, 400, 401, 403, 404, 405, 406, 501, 503
-   */
-  get: async (context, request, h) => {
-    return h.response(await healthCheck.getHealth()).code(200)
-  }
-}
+describe('Routes', () => {
+  describe('APIRoutes', () => {
+    it('returns all API routes', async () => {
+      // Arrange
+      const routes = APIRoutes(mockApi)
+
+      // Assert
+      await expect(routes.length > 0).toBe(true)
+
+      // Act/Assert
+      routes.forEach(route => {
+        mockHandleRequest.mockClear()
+        // Act
+        route.handler({}, {})
+        // Assert
+        expect(mockHandleRequest).toHaveBeenCalled()
+      })
+    })
+  })
+})

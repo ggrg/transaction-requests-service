@@ -17,58 +17,51 @@
  optionally within square brackets <email>.
  * Gates Foundation
 
- - Rajiv Mothilal <rajiv.mothilal@modusbox.com>
+ * Lewis Daly <lewisd@crosslaketech.com>
 
  --------------
  ******/
+
 'use strict'
 
-const Package = require('../package')
-const Inert = require('@hapi/inert')
-const Vision = require('@hapi/vision')
-const Blipp = require('blipp')
-const ErrorHandling = require('@mojaloop/central-services-error-handling')
-const EventPlugin = require('@mojaloop/central-services-shared').Util.Hapi.HapiEventPlugin
-const OpenapiBackendValidator = require('@mojaloop/central-services-shared').Util.Hapi.OpenapiBackendValidator
-const registerPlugins = async (server, openAPIBackend) => {
-  await server.register(OpenapiBackendValidator)
+const mockRequestLogger = jest.fn()
+jest.mock('../../../src/lib/requestLogger', () => ({
+  logResponse: mockRequestLogger
+}))
 
-  await server.register({
-    plugin: require('hapi-swagger'),
-    options: {
-      info: {
-        title: 'Event Sidecar Swagger Documentation',
-        version: Package.version
-      }
-    }
+const { failActionHandler, onPreHandler } = require('../../../src/handlers/server')
+
+describe('Server Handlers', () => {
+  afterEach(() => {
+    mockRequestLogger.mockClear()
   })
 
-  await server.register({
-    plugin: require('@hapi/good'),
-    options: {
-      ops: {
-        interval: 10000
-      }
-    }
+  describe('failActionHandler', () => {
+    it('throws the reformatted error', async () => {
+      // Arrange
+      const input = new Error('Generic error')
+
+      // Act
+      const action = async () => failActionHandler(null, null, input)
+
+      // Assert
+      await expect(action()).rejects.toThrowError('Generic error')
+    })
   })
 
-  await server.register({
-    plugin: {
-      name: 'openapi',
-      version: '1.0.0',
-      multiple: true,
-      register: function (server, options) {
-        server.expose('openapi', options.openapi)
-      }
-    },
-    options: {
-      openapi: openAPIBackend
-    }
+  describe('onPreHandler', () => {
+    it('logs the response', async () => {
+      // Arrange
+      const request = {}
+      const h = jest.fn().mockImplementation(() => ({
+        continue: jest.fn()
+      }))
+
+      // Act
+      await onPreHandler(request, h)
+
+      // Assert
+      expect(mockRequestLogger).toHaveBeenCalled()
+    })
   })
-
-  await server.register([Inert, Vision, Blipp, ErrorHandling, EventPlugin])
-}
-
-module.exports = {
-  registerPlugins
-}
+})

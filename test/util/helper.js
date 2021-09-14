@@ -18,10 +18,21 @@
  * Gates Foundation
  * - Name Surname <name.surname@gatesfoundation.com>
 
- *  - Rajiv Mothilal <rajiv.mothilal@modusbox.com>
+ * ModusBox
+ - Rajiv Mothilal <rajiv.mothilal@modusbox.com>
+
+ * Crosslake
+ - Lewis Daly <lewisd@crosslaketech.com>
+
  --------------
  ******/
 'use strict'
+
+const Path = require('path')
+const OpenapiBackend = require('@mojaloop/central-services-shared').Util.OpenapiBackend
+
+const Plugins = require('../../src/plugins')
+const Handlers = require('../../src/handlers')
 
 const destinationFsp = 'dfsp2'
 const sourceFsp = 'dfsp1'
@@ -29,13 +40,9 @@ const resource = 'transaction'
 
 /**
  * @function defaultHeaders
- *
  * @description This returns a set of default headers used for requests
- *
- * see https://nodejs.org/dist/latest-v10.x/docs/api/http.html#http_message_headers
- *
+ *   see https://nodejs.org/dist/latest-v10.x/docs/api/http.html#http_message_headers
  * @param {string} version - the version for the accept and content-type headers
- *
  * @returns {object} Returns the default headers
  */
 
@@ -51,6 +58,31 @@ function defaultHeaders (version = '1.0') {
   }
 }
 
+const serverSetup = async (server) => {
+  const api = await OpenapiBackend.initialise(Path.resolve(__dirname, '../../src/interface/openapi.yaml'), Handlers)
+  await Plugins.registerPlugins(server, api)
+  // use as a catch-all handler
+  server.route({
+    method: ['GET', 'POST', 'PUT', 'DELETE'],
+    path: '/{path*}',
+    handler: (req, h) => {
+      return api.handleRequest(
+        {
+          method: req.method,
+          path: req.path,
+          body: req.payload,
+          query: req.query,
+          headers: req.headers
+        },
+        req,
+        h
+      )
+      // TODO: follow instructions https://github.com/anttiviljami/openapi-backend/blob/master/DOCS.md#postresponsehandler-handler
+    }
+  })
+}
+
 module.exports = {
-  defaultHeaders
+  defaultHeaders,
+  serverSetup
 }

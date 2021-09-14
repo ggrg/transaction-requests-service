@@ -29,10 +29,11 @@
 
 'use strict'
 
-const RC = require('rc')('ES', require('../../config/default.json'))
+const RC = require('parse-strings-in-object')(require('rc')('ES', require('../../config/default.json')))
 
 module.exports = {
   PORT: RC.PORT,
+  ERROR_HANDLING: RC.ERROR_HANDLING,
   SWITCH_ENDPOINT: RC.SWITCH_ENDPOINT,
   ENDPOINT_CACHE_CONFIG: RC.ENDPOINT_CACHE_CONFIG,
   INSTRUMENTATION_METRICS_DISABLED: RC.INSTRUMENTATION.METRICS.DISABLED,

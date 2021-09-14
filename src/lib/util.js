@@ -17,58 +17,52 @@
  optionally within square brackets <email>.
  * Gates Foundation
 
- - Rajiv Mothilal <rajiv.mothilal@modusbox.com>
+ * Crosslake
+ - Lewis Daly <lewisd@crosslaketech.com>
+
+ * ModusBox
+ - Steven Oderayi <steven.oderayi@modusbox.com>
 
  --------------
  ******/
 'use strict'
 
-const Package = require('../package')
-const Inert = require('@hapi/inert')
-const Vision = require('@hapi/vision')
-const Blipp = require('blipp')
-const ErrorHandling = require('@mojaloop/central-services-error-handling')
-const EventPlugin = require('@mojaloop/central-services-shared').Util.Hapi.HapiEventPlugin
-const OpenapiBackendValidator = require('@mojaloop/central-services-shared').Util.Hapi.OpenapiBackendValidator
-const registerPlugins = async (server, openAPIBackend) => {
-  await server.register(OpenapiBackendValidator)
+const util = require('util')
+const Enum = require('@mojaloop/central-services-shared').Enum
 
-  await server.register({
-    plugin: require('hapi-swagger'),
-    options: {
-      info: {
-        title: 'Event Sidecar Swagger Documentation',
-        version: Package.version
-      }
-    }
-  })
+/**
+ * @function getStackOrInspect
+ * @description Gets the error stack, or uses util.inspect to inspect the error
+ * @param {*} err - An error object
+ */
+function getStackOrInspect (err) {
+  return err.stack || util.inspect(err)
+}
 
-  await server.register({
-    plugin: require('@hapi/good'),
-    options: {
-      ops: {
-        interval: 10000
-      }
-    }
-  })
-
-  await server.register({
-    plugin: {
-      name: 'openapi',
-      version: '1.0.0',
-      multiple: true,
-      register: function (server, options) {
-        server.expose('openapi', options.openapi)
-      }
-    },
-    options: {
-      openapi: openAPIBackend
-    }
-  })
-
-  await server.register([Inert, Vision, Blipp, ErrorHandling, EventPlugin])
+/**
+ * @function getSpanTags
+ * @description Returns span tags based on headers, transactionType and action.
+ * @param {Object} param
+ * @param {string} transactionType
+ * @param {string} transactionAction
+ * @returns {Object}
+ */
+const getSpanTags = ({ headers, payload, params }, transactionType, transactionAction) => {
+  const tags = {
+    transactionType,
+    transactionAction,
+    transactionId: (payload && payload.transactionRequestId) || (params && params.ID) || (headers && headers.ID) || undefined
+  }
+  if (headers && headers[Enum.Http.Headers.FSPIOP.SOURCE]) {
+    tags.source = headers[Enum.Http.Headers.FSPIOP.SOURCE]
+  }
+  if (headers && headers[Enum.Http.Headers.FSPIOP.DESTINATION]) {
+    tags.destination = headers[Enum.Http.Headers.FSPIOP.DESTINATION]
+  }
+  return tags
 }
 
 module.exports = {
-  registerPlugins
+  getStackOrInspect,
+  getSpanTags
 }

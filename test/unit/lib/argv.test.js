@@ -16,32 +16,25 @@
  their names indented and be marked with a '-'. Email address can be added
  optionally within square brackets <email>.
  * Gates Foundation
+ - Name Surname <name.surname@gatesfoundation.com>
 
- * ModusBox
- - Rajiv Mothilal <rajiv.mothilal@modusbox.com>
- - Steven Oderayi <steven.oderayi@modusbox.com>
+ * Crosslake
+ - Lewis Daly <lewisd@crosslaketech.com>
 
  --------------
  ******/
+
 'use strict'
 
-const HealthCheck = require('@mojaloop/central-services-shared').HealthCheck.HealthCheck
-const packageJson = require('../../package.json')
+const Argv = require('../../../src/lib/argv')
 
-const healthCheck = new HealthCheck(packageJson, [])
+describe('Argv', () => {
+  it('getArgs returns the args', async () => {
+    // Arrange
+    // Act
+    const result = Argv.getArgs()
 
-/**
- * Operations on /health
- */
-module.exports = {
-  /**
-   * summary: Get Server
-   * description: The HTTP request GET /health is used to return the current status of the API.
-   * parameters:
-   * produces: application/json
-   * responses: 200, 400, 401, 403, 404, 405, 406, 501, 503
-   */
-  get: async (context, request, h) => {
-    return h.response(await healthCheck.getHealth()).code(200)
-  }
-}
+    // Assert
+    expect(result.length > 0).toBe(true)
+  })
+})

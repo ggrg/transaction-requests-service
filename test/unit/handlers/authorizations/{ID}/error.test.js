@@ -8,25 +8,28 @@ jest.mock('@mojaloop/central-services-logger', () => {
   }
 })
 
-const Sinon = require('sinon')
+jest.mock('../../../../../src/domain/authorizations/authorizations', () => {
+  return {
+    forwardAuthorizationError: jest.fn()
+  }
+})
+
 const Hapi = require('@hapi/hapi')
 const ErrorHandler = require('@mojaloop/central-services-error-handling')
 const Logger = require('@mojaloop/central-services-logger')
 
 const Mockgen = require('../../../../util/mockgen.js')
 const Helper = require('../../../../util/helper')
-const Handler = require('../../../../../src/domain/transactionRequests/transactionRequests')
-
-let sandbox
+const Handler = require('../../../../../src/domain/authorizations/authorizations')
 const server = new Hapi.Server()
 
-describe('/transactionRequests/{ID}/error', () => {
+/**
+ * Tests for /authorizations/{ID}/error
+ */
+describe('/authorizations/{ID}/error', () => {
   // URI
-  const path = '/transactionRequests/{ID}/error'
-
+  const path = '/authorizations/{ID}/error'
   beforeAll(async () => {
-    sandbox = Sinon.createSandbox()
-    sandbox.stub(Handler, 'forwardTransactionRequestError').returns(Promise.resolve())
     await Helper.serverSetup(server)
   })
 
@@ -34,21 +37,21 @@ describe('/transactionRequests/{ID}/error', () => {
     server.stop()
   })
 
-  afterEach(() => {
-    sandbox.restore()
+  beforeEach(() => {
+    Handler.forwardAuthorizationError = jest.fn().mockResolvedValue()
   })
 
   describe('PUT', () => {
     // HTTP Method
     const method = 'put'
 
-    it('handles a PUT', async () => {
+    it('returns a 200 response code', async () => {
       const request = await Mockgen.generateRequest(path, method)
 
       // Arrange
       const options = {
         method,
-        url: path,
+        url: path + request.query.toURLEncodedString(),
         headers: request.headers,
         payload: request.body
       }
@@ -58,6 +61,7 @@ describe('/transactionRequests/{ID}/error', () => {
 
       // Assert
       expect(response.statusCode).toBe(200)
+      expect(Handler.forwardAuthorizationError).toHaveBeenCalledTimes(1)
     })
 
     it('handles when error is thrown', async () => {
@@ -66,13 +70,13 @@ describe('/transactionRequests/{ID}/error', () => {
       // Arrange
       const options = {
         method,
-        url: path,
+        url: path + request.query.toURLEncodedString(),
         headers: request.headers,
         payload: request.body
       }
 
       const err = new Error('Error occured')
-      Handler.forwardTransactionRequestError = sandbox.stub().throws(err)
+      Handler.forwardAuthorizationError.mockImplementation(() => { throw err })
 
       // Act
       const response = await server.inject(options)

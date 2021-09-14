@@ -1,25 +1,24 @@
 'use strict'
 
 const Sinon = require('sinon')
-const getPort = require('get-port')
-const { initialize } = require('../../../src/server')
-let sandbox
+const Hapi = require('@hapi/hapi')
+const Metrics = require('@mojaloop/central-services-metrics')
+const Helper = require('../../util/helper')
 
-let server
-jest.mock('@mojaloop/central-services-metrics', () => ({
-  setup: jest.fn()
-}))
+let sandbox
+const server = new Hapi.Server()
 
 /**
- * Tests for /health
+ * Tests for /metrics
  */
-describe('/health', () => {
+describe('/metrics', () => {
   // URI
-  const path = '/health'
+  const path = '/metrics'
 
   beforeAll(async () => {
-    server = await initialize(await getPort())
     sandbox = Sinon.createSandbox()
+    await Helper.serverSetup(server)
+    sandbox.stub(Metrics, 'getMetricsForPrometheus').returns({})
   })
 
   afterAll(() => {
