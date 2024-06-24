@@ -1,7 +1,12 @@
 'use strict'
 
+const EventSdk = require('@mojaloop/event-sdk')
 const Enum = require('@mojaloop/central-services-shared').Enum
+const ErrorHandler = require('@mojaloop/central-services-error-handling')
+const Logger = require('@mojaloop/central-services-logger')
+const Metrics = require('@mojaloop/central-services-metrics')
 const transactionRequest = require('../../domain/transactionRequests/transactionRequests')
+const LibUtil = require('../../lib/util')
 
 /**
  * Operations on /transactionRequests/{ID}
@@ -14,9 +19,32 @@ module.exports = {
    * produces: application/json
    * responses: 202, 400, 401, 403, 404, 405, 406, 501, 503
    */
-  get: function (request, h) {
-    transactionRequest.forwardTransactionRequest(request, Enum.EndPoints.FspEndpointTemplates.TRANSACTION_REQUEST_GET)
-    return h.response().code(Enum.Http.ReturnCodes.ACCEPTED.CODE)
+  get: async (context, request, h) => {
+    const histTimerEnd = Metrics.getHistogram(
+      'transaction_requests_get',
+      'Get transaction request by Id',
+      ['success']
+    ).startTimer()
+    const span = request.span
+    try {
+      const tags = LibUtil.getSpanTags(request, Enum.Events.Event.Type.TRANSACTION_REQUEST, Enum.Events.Event.Action.LOOKUP)
+      span.setTags(tags)
+      await span.audit({
+        headers: request.headers,
+        payload: request.payload
+      }, EventSdk.AuditEventAction.start)
+      transactionRequest.forwardTransactionRequest(Enum.EndPoints.FspEndpointTemplates.TRANSACTION_REQUEST_GET, request.headers, Enum.Http.RestMethods.GET, request.params, request.payload, span).catch(err => {
+        // Do nothing with the error - forwardTransactionRequest takes care of async errors
+        request.server.log(['error'], `ERROR - forwardTransactionRequest: ${LibUtil.getStackOrInspect(err)}`)
+      })
+      histTimerEnd({ success: true })
+      return h.response().code(Enum.Http.ReturnCodes.ACCEPTED.CODE)
+    } catch (err) {
+      const fspiopError = ErrorHandler.Factory.reformatFSPIOPError(err)
+      Logger.error(fspiopError)
+      histTimerEnd({ success: false })
+      throw fspiopError
+    }
   },
   /**
    * summary: TransactionRequestsByID
@@ -25,8 +53,31 @@ module.exports = {
    * produces: application/json
    * responses: 200, 400, 401, 403, 404, 405, 406, 501, 503
    */
-  put: function (request, h) {
-    transactionRequest.forwardTransactionRequest(request, Enum.EndPoints.FspEndpointTemplates.TRANSACTION_REQUEST_PUT)
-    return h.response().code(Enum.Http.ReturnCodes.OK.CODE)
+  put: async (context, request, h) => {
+    const histTimerEnd = Metrics.getHistogram(
+      'transaction_requests_put',
+      'Put transaction request by Id',
+      ['success']
+    ).startTimer()
+    const span = request.span
+    try {
+      const tags = LibUtil.getSpanTags(request, Enum.Events.Event.Type.TRANSACTION_REQUEST, Enum.Events.Event.Action.PUT)
+      span.setTags(tags)
+      await span.audit({
+        headers: request.headers,
+        payload: request.payload
+      }, EventSdk.AuditEventAction.start)
+      transactionRequest.forwardTransactionRequest(Enum.EndPoints.FspEndpointTemplates.TRANSACTION_REQUEST_PUT, request.headers, Enum.Http.RestMethods.PUT, request.params, request.payload, span).catch(err => {
+        // Do nothing with the error - forwardTransactionRequest takes care of async errors
+        request.server.log(['error'], `ERROR - forwardTransactionRequest: ${LibUtil.getStackOrInspect(err)}`)
+      })
+      histTimerEnd({ success: true })
+      return h.response().code(Enum.Http.ReturnCodes.OK.CODE)
+    } catch (err) {
+      const fspiopError = ErrorHandler.Factory.reformatFSPIOPError(err)
+      Logger.error(fspiopError)
+      histTimerEnd({ success: false })
+      throw fspiopError
+    }
   }
 }

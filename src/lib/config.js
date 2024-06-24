@@ -29,13 +29,67 @@
 
 'use strict'
 
-const RC = require('rc')('ES', require('../../config/default.json'))
+const RC = require('parse-strings-in-object')(require('rc')('ES', require('../../config/default.json')))
+
+const DEFAULT_PROTOCOL_VERSION = {
+  CONTENT: {
+    DEFAULT: '1.1',
+    VALIDATELIST: [
+      '1.0',
+      '1.1'
+    ]
+  },
+  ACCEPT: {
+    DEFAULT: '1',
+    VALIDATELIST: [
+      '1',
+      '1.0',
+      '1.1'
+    ]
+  }
+}
+
+const getProtocolVersions = (defaultProtocolVersions, overrideProtocolVersions) => {
+  const T_PROTOCOL_VERSION = {
+    ...defaultProtocolVersions,
+    ...overrideProtocolVersions
+  }
+
+  if (overrideProtocolVersions && overrideProtocolVersions.CONTENT) {
+    T_PROTOCOL_VERSION.CONTENT = {
+      ...defaultProtocolVersions.CONTENT,
+      ...overrideProtocolVersions.CONTENT
+    }
+  }
+  if (overrideProtocolVersions && overrideProtocolVersions.ACCEPT) {
+    T_PROTOCOL_VERSION.ACCEPT = {
+      ...defaultProtocolVersions.ACCEPT,
+      ...overrideProtocolVersions.ACCEPT
+    }
+  }
+
+  if (T_PROTOCOL_VERSION.CONTENT &&
+    T_PROTOCOL_VERSION.CONTENT.VALIDATELIST &&
+    (typeof T_PROTOCOL_VERSION.CONTENT.VALIDATELIST === 'string' ||
+      T_PROTOCOL_VERSION.CONTENT.VALIDATELIST instanceof String)) {
+    T_PROTOCOL_VERSION.CONTENT.VALIDATELIST = JSON.parse(T_PROTOCOL_VERSION.CONTENT.VALIDATELIST)
+  }
+  if (T_PROTOCOL_VERSION.ACCEPT &&
+    T_PROTOCOL_VERSION.ACCEPT.VALIDATELIST &&
+    (typeof T_PROTOCOL_VERSION.ACCEPT.VALIDATELIST === 'string' ||
+      T_PROTOCOL_VERSION.ACCEPT.VALIDATELIST instanceof String)) {
+    T_PROTOCOL_VERSION.ACCEPT.VALIDATELIST = JSON.parse(T_PROTOCOL_VERSION.ACCEPT.VALIDATELIST)
+  }
+  return T_PROTOCOL_VERSION
+}
 
 module.exports = {
   PORT: RC.PORT,
+  ERROR_HANDLING: RC.ERROR_HANDLING,
   SWITCH_ENDPOINT: RC.SWITCH_ENDPOINT,
   ENDPOINT_CACHE_CONFIG: RC.ENDPOINT_CACHE_CONFIG,
   INSTRUMENTATION_METRICS_DISABLED: RC.INSTRUMENTATION.METRICS.DISABLED,
   INSTRUMENTATION_METRICS_LABELS: RC.INSTRUMENTATION.METRICS.labels,
-  INSTRUMENTATION_METRICS_CONFIG: RC.INSTRUMENTATION.METRICS.config
+  INSTRUMENTATION_METRICS_CONFIG: RC.INSTRUMENTATION.METRICS.config,
+  PROTOCOL_VERSIONS: getProtocolVersions(DEFAULT_PROTOCOL_VERSION, RC.PROTOCOL_VERSIONS)
 }

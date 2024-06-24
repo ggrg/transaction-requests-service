@@ -28,15 +28,199 @@
  ******/
 
 'use strict'
-const SwagMock = require('swagmock')
-const Path = require('path')
-const apiPath = Path.resolve(__dirname, '../../src/interface/swagger.json')
-let mockGen
+const { OpenApiMockGenerator } = require('@mojaloop/ml-testing-toolkit-shared-lib')
 
-module.exports = function () {
-  /**
-   * Cached mock generator
-   */
-  mockGen = mockGen || SwagMock(apiPath)
-  return mockGen
+/**
+ * Mock Span
+ */
+class Span {
+  constructor () {
+    this.isFinished = false
+  }
+
+  audit () {
+    return jest.fn()
+  }
+
+  error () {
+    return jest.fn()
+  }
+
+  finish () {
+    return jest.fn()
+  }
+
+  debug () {
+    return jest.fn()
+  }
+
+  info () {
+    return jest.fn()
+  }
+
+  getChild () {
+    return new Span()
+  }
+}
+
+const mockSpan = () => {
+  return new Span()
+}
+
+let openApiMockGenerator
+
+// Factory generator for OpenApiRequestGenerator singleton
+const init = async () => {
+  if (!openApiMockGenerator) {
+    openApiMockGenerator = new OpenApiMockGenerator()
+    await openApiMockGenerator.load('./src/interface/openapi.yaml')
+  }
+  return openApiMockGenerator
+}
+
+const generateRequestHeaders = async (path, httpMethod, resource, protocolVersions, overrideRefs = null) => {
+  const generator = await init()
+  // Default header override refs
+  const defaultHeaderRefs = [
+    {
+      id: 'content-type',
+      pattern: `application/vnd\\.interoperability\\.${resource}\\+json;version=${protocolVersions.CONTENT.DEFAULT.toString().replace('.', '\\.')}`
+    },
+    {
+      id: 'accept',
+      pattern: `application/vnd\\.interoperability\\.${resource}\\+json;version=${protocolVersions.ACCEPT.DEFAULT.toString().replace('.', '\\.')}`
+    },
+    {
+      id: 'date',
+      pattern: `${new Date().toUTCString()}`
+    }
+  ]
+
+  let localOverrideRefs
+  if (overrideRefs == null) {
+    localOverrideRefs = [...defaultHeaderRefs]
+  } else {
+    localOverrideRefs = [...overrideRefs]
+  }
+
+  const headers = await generator.generateRequestHeaders(path, httpMethod, localOverrideRefs)
+  delete headers['content-length']
+  return headers
+}
+
+const generateRequestBody = async (path, httpMethod, overrideRefs = null) => {
+  const generator = await init()
+
+  let localOverrideRefs
+  if (overrideRefs == null) {
+    localOverrideRefs = []
+  } else {
+    localOverrideRefs = [...overrideRefs]
+  }
+  const body = await generator.generateRequestBody(path, httpMethod, localOverrideRefs)
+  return body
+}
+
+const generateRequestQueryParams = async (path, httpMethod, overrideRefs = null) => {
+  const generator = await init()
+
+  let localOverrideRefs
+  if (overrideRefs == null) {
+    localOverrideRefs = []
+  } else {
+    localOverrideRefs = [...overrideRefs]
+  }
+
+  const params = await generator.generateRequestQueryParams(path, httpMethod, localOverrideRefs)
+
+  const result = {
+    params,
+    toString: () => {
+      return Object.entries(result.params).reduce((acc, [k, v]) => {
+        if (acc === '?') {
+          return `${acc}${k}=${v}`
+        } else {
+          return `${acc}&${k}=${v}`
+        }
+      }, '?')
+    },
+    toURLEncodedString: () => {
+      return encodeURI(result.toString())
+    }
+  }
+  return result
+}
+
+const generateRequestPathParams = async (path, httpMethod, overrideRefs = null) => {
+  const generator = await init()
+
+  let localOverrideRefs
+  if (overrideRefs == null) {
+    localOverrideRefs = []
+  } else {
+    localOverrideRefs = [...overrideRefs]
+  }
+
+  const params = await generator.generateRequestPathParams(path, httpMethod, localOverrideRefs)
+
+  const result = {
+    params,
+    toString: () => {
+      return Object.entries(result.params).reduce((acc, [k, v]) => {
+        if (acc === '?') {
+          return `${acc}${k}=${v}`
+        } else {
+          return `${acc}&${k}=${v}`
+        }
+      }, '?')
+    },
+    toURLEncodedString: () => {
+      return encodeURI(result.toString())
+    }
+  }
+  return result
+}
+
+const generateRequest = async (path, httpMethod, resource, protocolVersions, override = null) => {
+  const localOverride = {
+    headers: null,
+    request: null
+  }
+  if (override != null) {
+    if (override.headers != null) {
+      localOverride.headers = [...override.headers]
+    }
+
+    if (override.request != null) {
+      localOverride.request = [...override.request]
+    }
+  }
+
+  const headers = await generateRequestHeaders(path, httpMethod, resource, protocolVersions, localOverride.headers)
+
+  let body
+  if (httpMethod.toLowerCase() !== 'get') {
+    body = await generateRequestBody(path, httpMethod, localOverride.request)
+  }
+
+  const query = await generateRequestQueryParams(path, httpMethod, localOverride.request)
+
+  const pathParams = await generateRequestPathParams(path, httpMethod, localOverride.request)
+
+  const request = {
+    headers,
+    body,
+    pathParams,
+    query
+  }
+  return request
+}
+
+module.exports = {
+  mockSpan,
+  generateRequest,
+  generateRequestBody,
+  generateRequestHeaders,
+  generateRequestQueryParams,
+  init
 }

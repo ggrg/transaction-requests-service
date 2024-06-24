@@ -24,21 +24,19 @@
 
 'use strict'
 
-const Hapi = require('@hapi/hapi')
-const HapiOpenAPI = require('hapi-openapi')
-const Path = require('path')
-const Config = require('./lib/config.js')
+const { Server } = require('@hapi/hapi')
 const Logger = require('@mojaloop/central-services-logger')
-const Plugins = require('./plugins')
-const RequestLogger = require('./lib/requestLogger')
-const Endpoint = require('@mojaloop/central-services-shared').Util.Endpoints
+const Metrics = require('@mojaloop/central-services-metrics')
+const Endpoints = require('@mojaloop/central-services-shared').Util.Endpoints
+const OpenapiBackend = require('@mojaloop/central-services-shared').Util.OpenapiBackend
 const ErrorHandler = require('@mojaloop/central-services-error-handling')
+const Path = require('path')
 
-const openAPIOptions = {
-  api: Path.resolve(__dirname, './interface/swagger.json'),
-  handlers: Path.resolve(__dirname, './handlers')
-}
-
+const Handlers = require('./handlers')
+const Plugins = require('./plugins')
+const ServerHandler = require('./handlers/server')
+const Routes = require('./handlers/routes')
+const Config = require('./lib/config.js')
 /**
  * @function createServer
  *
@@ -48,45 +46,46 @@ const openAPIOptions = {
  * @returns {Promise<Server>} Returns the Server object
  */
 const createServer = async (port) => {
-  const server = await new Hapi.Server({
+  const server = await new Server({
     port,
     routes: {
       validate: {
         options: ErrorHandler.validateRoutes(),
-        failAction: async (request, h, err) => {
-          throw ErrorHandler.Factory.reformatFSPIOPError(err)
-        }
+        failAction: ServerHandler.failActionHandler
       }
     }
   })
-  await Plugins.registerPlugins(server)
-  await server.register([
-    {
-      plugin: HapiOpenAPI,
-      options: openAPIOptions
-    }
-  ])
+  const api = await OpenapiBackend.initialise(Path.resolve(__dirname, './interface/openapi.yaml'), Handlers)
+  await Plugins.registerPlugins(server, api)
   await server.ext([
     {
       type: 'onPreHandler',
-      method: (request, h) => {
-        RequestLogger.logResponse(request)
-        return h.continue
-      }
+      method: ServerHandler.onPreHandler
     }
   ])
+
+  server.route(Routes.APIRoutes(api))
+  // TODO: follow instructions https://github.com/anttiviljami/openapi-backend/blob/master/DOCS.md#postresponsehandler-handler
+
   await server.start()
   return server
 }
 
+const initializeInstrumentation = () => {
+  if (!Config.INSTRUMENTATION_METRICS_DISABLED) {
+    Metrics.setup(Config.INSTRUMENTATION_METRICS_CONFIG)
+  }
+}
+
 const initialize = async (port = Config.PORT) => {
   const server = await createServer(port)
-  server.plugins.openapi.setHost(server.info.host + ':' + server.info.port)
   Logger.info(`Server running on ${server.info.host}:${server.info.port}`)
-  await Endpoint.initializeCache(Config.ENDPOINT_CACHE_CONFIG)
+  await Endpoints.initializeCache(Config.ENDPOINT_CACHE_CONFIG)
+  initializeInstrumentation()
   return server
 }
 
 module.exports = {
+  createServer, // exported for testing only
   initialize
 }
